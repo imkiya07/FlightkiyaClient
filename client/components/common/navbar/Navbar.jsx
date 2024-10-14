@@ -83,9 +83,12 @@ export default function Navbar() {
           </div>
 
           {/* Sign In Button */}
-          <button className="w-[90px] h-[40px] bg-[var(--primary-btn)] text-[var(--dark-text)] rounded-md font-semibold text-[12px]">
+          <Link href="http://localhost:3000/auth-login">
+          <button  className="w-[90px] h-[40px] bg-[var(--primary-btn)] text-[var(--dark-text)] rounded-md font-semibold text-[12px]">
             Sign in
           </button>
+          </Link>
+          
         </div>
       </nav>
       <div
