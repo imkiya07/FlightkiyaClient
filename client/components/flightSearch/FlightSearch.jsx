@@ -1,729 +1,417 @@
+// pages/FlightSearch.js
 "use client";
-import React, { useState } from "react";
-import flight from "@/public/icons/flight.png";
-import hotel from "@/public/icons/hotel.png";
-import tour from "@/public/icons/tour.png";
-import visa from "@/public/icons/visa.png";
-import Image from "next/image";
-import Navbar from "../common/navbar/Navbar";
-import Select from "react-select";
-import makeAnimated from "react-select/animated";
-import DatePicker from "react-datepicker";
-import search from "@/public/icons/search.svg";
-import "react-datepicker/dist/react-datepicker.css";
-import RequestNow from "../home/requestNow/RequestNow";
-import Link from "next/link";
+import { useState } from 'react';
+import axios from 'axios';
+import Image from 'next/image'; // Import for handling Next.js images
+import Navbar from '../common/navbar/Navbar'; // Assuming you have this component
+import { MdFlightTakeoff } from "react-icons/md";
+import { LiaCcVisa } from "react-icons/lia";
+import { RiHotelFill } from "react-icons/ri";
+import { GiTreehouse } from "react-icons/gi";
 
-const options = require("../../airports.json");
-const customStyles = {
-  control: (provided) => ({
-    ...provided,
-    padding: 0, // Remove padding from the control
-    border: "none", // Remove all borders from the control
-    boxShadow: "none", // Remove any box shadow
-    fontSize: "13px",
-    minHeight: "10px",
-    width: "90%",
-    "&:hover": {
-      border: "none", // Remove border on hover
-    },
-  }),
-  valueContainer: (provided) => ({
-    ...provided,
+import biman from "@/public/images/biman-bd.png"; // Image import
+import arrowRight from "@/public/icons/arrow-right.svg"; // Icon import
+import credit from "@/public/icons/credit.svg"; // Icon import
+import arrowDown from "@/public/icons/down-arrow.svg"; // Icon import
+import arrowUp from "@/public/icons/arrowhead-up.png"; // Icon import
+import right from "@/public/icons/right-arrow1.svg"; // Icon import
 
-    padding: 0,
-    // Remove padding around the selected value
-  }),
-  menu: (provided) => ({
-    ...provided,
-    border: "none", // Remove all borders from the menu
-    boxShadow: "none",
-    // Remove any box shadow from the menu
-  }),
-  menuList: (provided) => ({
-    ...provided,
-    padding: 0, // Remove padding from menu list
-    border: "none", // Remove all borders from the menu list
-    fontSize: "12px",
-  }),
-  placeholder: (provided) => ({
-    ...provided,
-    marginLeft: 0, // Remove left margin from the placeholder
-    paddingLeft: 0, // Remove left padding from the placeholder
-  }),
-  dropdownIndicator: () => ({
-    display: "none", // Completely hide the dropdown indicator
-  }),
-  indicatorSeparator: () => ({
-    display: "none", // Remove the vertical separator line
-  }),
-};
-
-const animatedComponents = makeAnimated();
 const FlightSearch = () => {
-  const [categoryTab, setCategoryTab] = useState("flight");
-  const [flyFrom, setFlyFrom] = useState("");
-  const [flyFromPlaceholder, setFlyFromPlaceholder] = useState({
-    label: "Dhaka, Bangladesh (DAC)",
-    value: "DAC",
+  const [flights, setFlights] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [departureDate, setDepartureDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [originCode, setOriginCode] = useState('');
+  const [destinationCode, setDestinationCode] = useState('');
+  const [tripType, setTripType] = useState('OneWay');
+  const [passengerType, setPassengerType] = useState('ADT');
+  const [passengerQuantity, setPassengerQuantity] = useState(1);
+  const [airportSuggestions, setAirportSuggestions] = useState({
+    origin: [],
+    destination: []
   });
-  const [flyTo, setFlyTo] = useState("");
-  const [flyToPlaceholder, setFlyToPlaceholder] = useState({
-    label: "New York, USA (JFK)",
-    value: "JFK",
-  });
 
-  const [wayTabs, setWayTabs] = useState("oneway");
-  const [departureDate, setDepartureDate] = useState(new Date());
-  const [arrivalDate, setArrivalDate] = useState(new Date() + 1);
-  const [adults, setAdults] = useState(0);
-  const [children, setChildren] = useState(0);
-  const [infants, setInfants] = useState(0);
-  const [childAges, setChildAges] = useState([]); // Default ages for children
-  const [flightClass, setFlightClass] = useState("Economy");
+  const [isOriginFocused, setIsOriginFocused] = useState(false);
+  const [isDestinationFocused, setIsDestinationFocused] = useState(false);
 
-  const handleIncrement = (setter, value) => setter(value + 1);
-  const handleDecrement = (setter, value) => value > 0 && setter(value - 1);
+  const fetchFlightData = async () => {
+    setLoading(true);
+    setError('');
 
-  const handleChildrenIncrement = () => {
-    setChildren(children + 1);
-    setChildAges([...childAges, 2]); // Add a default age (e.g., 2 years) for the new child
-  };
+    if (!departureDate || !originCode || !destinationCode || (tripType === 'RoundTrip' && !returnDate)) {
+      setError('Please fill in all required fields.');
+      setLoading(false);
+      return;
+    }
 
-  const handleChildrenDecrement = () => {
-    if (children > 0) {
-      setChildren(children - 1);
-      setChildAges(childAges.slice(0, -1)); // Remove the last child age
+    try {
+      const response = await axios.post('https://fk-api.adbiyas.com/api/b2c/search', {
+        "OriginDestinationInformations": [
+          {
+            "DepartureDateTime": `${departureDate}T00:00:00`,
+            "OriginLocationCode": originCode,
+            "DestinationLocationCode": destinationCode
+          },
+          ...(tripType === 'RoundTrip'
+            ? [{
+              "DepartureDateTime": `${returnDate}T00:00:00`,
+              "OriginLocationCode": destinationCode,
+              "DestinationLocationCode": originCode
+            }]
+            : [])
+        ],
+        "TravelPreferences": {
+          "AirTripType": tripType
+        },
+        "PricingSourceType": "Public",
+        "PassengerTypeQuantities": [
+          {
+            "Code": passengerType,
+            "Quantity": passengerQuantity
+          }
+        ],
+        "RequestOptions": "Fifty"
+      });
+
+      if (response.data.success) {
+        setFlights(response.data.results);
+      } else {
+        setError('No flights found.');
+      }
+    } catch (err) {
+      setError('An error occurred while fetching flight data.');
+    } finally {
+      setLoading(false);
     }
   };
-  const [travelerInputShow, setTravelerInputShow] = useState(false);
 
-  const [cities, setCities] = useState([{ id: 1 }]); // Initial state with one city row
 
-  // Function to handle adding a new city row
-  const handleAddCity = () => {
-    setCities([...cities, { id: cities.length + 1 }]); // Add a new city with a unique id
-  };
+  ///handel Airport data here 
 
-  const handleDeleteCity = () => {
-    if (cities.length > 1) {
-      setCities(cities.slice(0, -1)); // Remove the last city row
+  const fetchAirports = async (searchTerm, type) => {
+    try {
+      const response = await axios.get(`https://fk-api.adbiyas.com/api/common/airports?size=25&search=${searchTerm}`);
+      if (response.data.success) {
+        setAirportSuggestions((prev) => ({
+          ...prev,
+          [type]: response.data.data
+        }));
+      }
+    } catch (err) {
+      setError('Error fetching airport suggestions');
     }
   };
+
+  const handleAirportChange = (e, type) => {
+    const value = e.target.value;
+    if (type === 'origin') {
+      setOriginCode(value);
+      if (value.length > 1) fetchAirports(value, 'origin');
+    } else if (type === 'destination') {
+      setDestinationCode(value);
+      if (value.length > 1) fetchAirports(value, 'destination');
+    }
+  };
+
+
+  
+
+  const [openDetailsIndex, setOpenDetailsIndex] = useState(null);
+  const [openRefundableIndex, setOpenRefundableIndex] = useState(null);
+
+  const toggleDetails = (index) => {
+    setOpenDetailsIndex(openDetailsIndex === index ? null : index);
+  };
+
+  const toggleRefundable = (index) => {
+    setOpenRefundableIndex(openRefundableIndex === index ? null : index);
+  };
+
   return (
-    <section className="bg-[url('/images/banner-temp.jpg')] bg-cover bg-center bg-fixed  w-full h-fit md:max-h-screen ">
-      <div className=" w-full container mx-auto ">
-        <div className="">
-          <Navbar />
+    <div className="w-full flex flex-col">
+     <section className="bg-[url('/images/banner-temp.jpg')] bg-cover bg-center bg-fixed w-full h-[1000px] md:max-h-screen relative">
+  <Navbar />
+
+  {/* Form Section */}
+  <div className="justify-center mt-28 flex">
+    <div className="justify-center flex flex-col">
+      {/* Tabs for Flight, Hotel, etc. */}
+      <div className="flex ml-[220px] bg-white shadow-lg w-[700px] py-5 px-8 rounded-t-[20px] justify-center gap-6">
+        <button className="py-2 px-4 flex items-center gap-2 border-b-4 border-blue-500">
+          <span className="text-blue-600">
+            <MdFlightTakeoff className="w-10 h-10" />
+          </span>
+          <span className="text-blue-600 text-[20px] font-semibold">Flight</span>
+        </button>
+        <button className="py-2 px-4 flex items-center gap-2 text-gray-500">
+          <span>
+            <RiHotelFill className="w-10 h-10" />
+          </span>
+          <span className="text-[20px] font-semibold">Hotel</span>
+        </button>
+        <button className="py-2 px-4 flex items-center gap-2 text-gray-500">
+          <span>
+            <GiTreehouse className="w-10 h-10" />
+          </span>
+          <span className="text-[20px] font-semibold">Tour</span>
+        </button>
+        <button className="py-2 px-4 flex items-center gap-2 text-gray-500">
+          <span>
+            <LiaCcVisa className="w-10 h-10" />
+          </span>
+          <span className="text-[20px] font-semibold">Visa</span>
+        </button>
+      </div>
+
+      {/* Form */}
+      <div className="flex flex-col items-center px-12 py-8 bg-white shadow-lg rounded-[20px]">
+        {/* Trip Type Selection */}
+        <div className="flex justify-center gap-8 mb-8">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              className="text-sky-400/50 w-5 h-5"
+              value="OneWay"
+              checked={tripType === 'OneWay'}
+              onChange={(e) => setTripType(e.target.value)}
+            />
+            <span className="text-[18px]">One Way</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              className="text-sky-400/50 w-5 h-5"
+              value="RoundTrip"
+              checked={tripType === 'RoundTrip'}
+              onChange={(e) => setTripType(e.target.value)}
+            />
+            <span className="text-[18px]">Round Way</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              className="text-sky-400/50 w-5 h-5"
+              value="MultiCity"
+              checked={tripType === 'MultiCity'}
+              onChange={(e) => setTripType(e.target.value)}
+            />
+            <span className="text-[18px]">Multi City</span>
+          </label>
         </div>
-        <div className="   rounded-[22px] pb-20 my-20">
-          <div className="px-5 md:px-20">
-            <div className="relative bg-white p-6 container shadow-lg h-fit md:h-[84px] rounded-[22px] w-full md:w-[551px] mx-auto bottom-[-25px]">
-              <div className="flex items-center justify-between px-2 md:px-14 flex-wrap">
-                <div
-                  className={`flex items-center gap-2 cursor-pointer ${
-                    categoryTab == "flight"
-                      ? "border-b-4 border-[var(--tertiary)] py-2 "
-                      : ""
-                  }`}
-                  onClick={() => setCategoryTab("flight")}
-                >
-                  <Image src={flight} alt="" className="w-[22px] h-[22px]" />
-                  <span className="text-[var(--secondary)] text-[16px] font-semibold">
-                    Flight
-                  </span>
-                </div>
-                <div
-                  className={`flex items-center gap-2 cursor-pointer ${
-                    categoryTab == "hotel"
-                      ? "border-b-4 border-[var(--tertiary)] py-2 "
-                      : ""
-                  }`}
-                  onClick={() => setCategoryTab("hotel")}
-                >
-                  <Image src={hotel} alt="" className="w-[22px] h-[22px]" />
-                  <span className="text-[var(--secondary)] text-[16px] font-semibold">
-                    Hotel
-                  </span>
-                </div>{" "}
-                <div
-                  className={`flex items-center gap-2 cursor-pointer ${
-                    categoryTab == "tour"
-                      ? "border-b-4 border-[var(--tertiary)] py-2 "
-                      : ""
-                  }`}
-                  onClick={() => setCategoryTab("tour")}
-                >
-                  <Image src={tour} alt="" className="w-[22px] h-[22px]" />
-                  <span className="text-[var(--secondary)] text-[16px] font-semibold">
-                    Tour
-                  </span>
-                </div>{" "}
-                <div
-                  className={`flex items-center gap-2 cursor-pointer ${
-                    categoryTab == "visa"
-                      ? "border-b-4 border-[var(--tertiary)] py-2"
-                      : ""
-                  }`}
-                  onClick={() => setCategoryTab("visa")}
-                >
-                  <Image src={visa} alt="" className="w-[22px] h-[22px]" />
-                  <span className="text-[var(--secondary)] text-[16px] font-semibold">
-                    Visa
-                  </span>
-                </div>
-              </div>
+
+        {/* Form Inputs */}
+        <div className="flex flex-wrap justify-center gap-6">
+          {/* Origin */}
+          <div className="flex flex-col items-start">
+            <label className="text-gray-600 mb-2">From</label>
+            <input
+              type="text"
+              value={originCode}
+              onChange={(e) => handleAirportChange(e, 'origin')}
+              placeholder="Enter Origin (e.g., DAC)"
+              className="border p-3 h-20 rounded-lg w-64"
+            />
+          </div>
+
+          {/* Destination */}
+          <div className="flex flex-col items-start">
+            <label className="text-gray-600 mb-2">To</label>
+            <input
+              type="text"
+              value={destinationCode}
+              onChange={(e) => handleAirportChange(e, 'destination')}
+              placeholder="Enter Destination (e.g., CXB)"
+              className="border p-3 rounded-lg h-20 w-64"
+            />
+          </div>
+
+          {/* Journey Date */}
+          <div className="flex flex-col items-start">
+            <label className="text-gray-600 mb-2">Journey Date</label>
+            <input
+              type="date"
+              value={departureDate}
+              onChange={(e) => setDepartureDate(e.target.value)}
+              className="border h-20 p-3 rounded-lg w-64"
+            />
+          </div>
+
+          {/* Return Date */}
+          {tripType === 'RoundTrip' && (
+            <div className="flex flex-col items-start">
+              <label className="text-gray-600 mb-2">Return Date</label>
+              <input
+                type="date"
+                value={returnDate}
+                onChange={(e) => setReturnDate(e.target.value)}
+                className="border p-3 h-20 rounded-lg w-64"
+              />
             </div>
-            <div className="bg-white  h-fit rounded-[22px] pt-16 px-14 pb-10">
-              {/* Way tabs */}
-              <div className="   flex items-start  gap-5 ">
-                <div
-                  className="flex items-center gap-1 cursor-pointer"
-                  onChange={() => setWayTabs("oneway")}
-                >
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      defaultChecked
-                      type="radio"
-                      className="h-5 w-5 cursor-pointer"
-                      name="route"
-                    />
-                    <span className="text-[var(--secondary)] text-[12px] font-bold">
-                      One way
-                    </span>
-                  </label>
-                </div>
-                <div
-                  className="flex items-center gap-1 cursor-pointer"
-                  onChange={() => setWayTabs("roundway")}
-                >
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      checked={wayTabs == "roundway"}
-                      type="radio"
-                      className="h-5  w-5 cursor-pointer"
-                      name="route"
-                    />
-                    <span className="text-[var(--secondary)] text-[12px] font-bold">
-                      Round way
-                    </span>
-                  </label>
-                </div>
-                <div
-                  className="flex items-center gap-1 cursor-pointer"
-                  onChange={() => setWayTabs("multicity")}
-                >
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      checked={wayTabs == "multicity"}
-                      type="radio"
-                      className="h-5  w-5 cursor-pointer"
-                      name="route"
-                    />
-                    <span className="text-[var(--secondary)] text-[12px] font-bold">
-                      Multi city
-                    </span>
-                  </label>
-                </div>
-              </div>
-              {/* inputs section */}
-              <div>
-                <div className="mt-5 flex items-center justify-evenly gap-5 flex-wrap">
-                  <div className="border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px] w-[234px] h-[79px]">
-                    <label className="w-full cursor-pointer">
-                      <div className="block">
-                        <span className="text-[var(--gray)] text-[10px] font-semibold block ">
-                          FROM
-                        </span>
-                        <span className="text-[12px] font-semibold">
-                          {flyFromPlaceholder.value}
-                        </span>
-                      </div>
-                      <Select
-                        className="cursor-pointer"
-                        closeMenuOnSelect={true}
-                        components={{
-                          ...animatedComponents,
-                        }}
-                        value={flyFromPlaceholder}
-                        onChange={(e) => {
-                          setFlyFrom(e.value);
-                          setFlyFromPlaceholder({
-                            label: e.label,
-                            value: e.value,
-                          });
-                        }}
-                        options={options}
-                        styles={customStyles}
-                      />
-                    </label>
-                  </div>
-                  <div className="border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px] w-[234px] h-[79px]">
-                    <label className="w-full cursor-pointer">
-                      <div className="block">
-                        <span className="text-[var(--gray)] text-[10px] font-semibold block ">
-                          To
-                        </span>
-                        <span className="text-[12px] font-semibold">
-                          {flyToPlaceholder.value}
-                        </span>
-                      </div>
-                      <Select
-                        className="cursor-pointer"
-                        closeMenuOnSelect={true}
-                        components={{
-                          ...animatedComponents,
-                        }}
-                        value={flyToPlaceholder}
-                        onChange={(e) => {
-                          setFlyTo(e.value);
-                          setFlyToPlaceholder({
-                            label: e.label,
-                            value: e.value,
-                          });
-                        }}
-                        options={options}
-                        styles={customStyles}
-                      />
-                    </label>
-                  </div>
-                  <div
-                    className={`border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px]  ${
-                      wayTabs == "roundway" ? "  w-[270px]" : " w-[234px]"
-                    }  h-[79px] flex `}
-                  >
-                    <label className="w-full cursor-pointer ">
-                      <div className="block">
-                        <span className="text-[var(--gray)] text-[9px] font-semibold block ">
-                          Journey Date
-                        </span>
-                        <span className="text-[12px]">
-                          {/* {flyFromPlaceholder.value} */}
-                          Saturday
-                        </span>
-                      </div>
+          )}
 
-                      {/* Conditionally render the DayPicker */}
-                      <DatePicker
-                        minDate={new Date()}
-                        selected={departureDate}
-                        className="custom-datepicker-input"
-                        calendarClassName="custom-datepicker-calendar"
-                        onChange={(date) => setDepartureDate(date)}
-                      />
-                    </label>
-                    {wayTabs == "roundway" && (
-                      <div className="border-s-2 ps-7 ">
-                        <label className="w-full cursor-pointer">
-                          <div className="block">
-                            <span className="text-[var(--gray)] text-[9px] font-semibold block ">
-                              Return Date
-                            </span>
-                            <span className="text-[12px]">
-                              {/* {flyFromPlaceholder.value} */}
-                              Saturday
-                            </span>
-                          </div>
-
-                          {/* Conditionally render the DayPicker */}
-                          <DatePicker
-                            minDate={departureDate}
-                            selected={arrivalDate}
-                            className="custom-datepicker-input"
-                            calendarClassName="custom-datepicker-calendar"
-                            onChange={(date) => setArrivalDate(date)}
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <div
-                      className="border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px] w-[234px] h-[79px]"
-                      onClick={() => setTravelerInputShow(!travelerInputShow)}
-                    >
-                      <label className="w-full cursor-pointer">
-                        <div className="block">
-                          <span className="text-[var(--gray)] text-[10px] font-semibold block ">
-                            Traveler, class
-                          </span>
-                          <span className="text-[12px] font-semibold block">
-                            {adults + children + infants > 1 ? (
-                              <>
-                                {adults +
-                                  children +
-                                  infants +
-                                  " " +
-                                  "Travelers"}
-                              </>
-                            ) : (
-                              <>
-                                {adults + children + infants + " " + "Traveler"}
-                              </>
-                            )}
-                          </span>
-                          <span className="text-[12px]">{flightClass}</span>
-                        </div>
-                      </label>
-                    </div>
-                    <div>
-                      {travelerInputShow && (
-                        <div
-                          className="absolute end-0 z-10 mt-2  rounded-md border border-gray-100 bg-white shadow-lg"
-                          role="menu"
-                        >
-                          <div className="w-full p-4 bg-white rounded-lg shadow-md">
-                            {/* Adults */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div>
-                                <h3 className="font-semibold">Adults</h3>
-                                <p className="text-sm text-gray-500">
-                                  12 years and above
-                                </p>
-                              </div>
-                              <div className="flex items-center">
-                                <button
-                                  onClick={() =>
-                                    handleDecrement(setAdults, adults)
-                                  }
-                                  className="text-lg font-semibold px-2"
-                                >
-                                  −
-                                </button>
-                                <span className="mx-2">{adults}</span>
-                                <button
-                                  onClick={() =>
-                                    handleIncrement(setAdults, adults)
-                                  }
-                                  className="text-lg font-semibold px-2"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Children */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div>
-                                <h3 className="font-semibold">Children</h3>
-                                <p className="text-sm text-gray-500">
-                                  2–11 years
-                                </p>
-                              </div>
-                              <div className="flex items-center">
-                                <button
-                                  onClick={handleChildrenDecrement}
-                                  className="text-lg font-semibold px-2"
-                                >
-                                  −
-                                </button>
-                                <span className="mx-2">{children}</span>
-                                <button
-                                  onClick={handleChildrenIncrement}
-                                  className="text-lg font-semibold px-2"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Children Ages */}
-                            {children > 0 && (
-                              <div className="mb-4">
-                                <h4 className="font-semibold">Child Ages</h4>
-                                <div className="flex space-x-2 mt-2">
-                                  {childAges.map((age, index) => (
-                                    <select
-                                      key={index}
-                                      value={age}
-                                      onChange={(e) => {
-                                        const newAges = [...childAges];
-                                        newAges[index] = Number(e.target.value);
-                                        setChildAges(newAges);
-                                      }}
-                                      className="border rounded px-2 py-1"
-                                    >
-                                      {[...Array(12).keys()].map((i) => (
-                                        <option key={i} value={i + 1}>
-                                          {i + 1}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Infants */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div>
-                                <h3 className="font-semibold">Infant</h3>
-                                <p className="text-sm text-gray-500">
-                                  Below 2 years
-                                </p>
-                              </div>
-                              <div className="flex items-center">
-                                <button
-                                  onClick={() =>
-                                    handleDecrement(setInfants, infants)
-                                  }
-                                  className="text-lg font-semibold px-2"
-                                >
-                                  −
-                                </button>
-                                <span className="mx-2">{infants}</span>
-                                <button
-                                  onClick={() =>
-                                    handleIncrement(setInfants, infants)
-                                  }
-                                  className="text-lg font-semibold px-2"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Class Selection */}
-                            <div className="mb-4">
-                              <h3 className="font-semibold mb-2">Class</h3>
-                              <div className="flex items-center space-x-4">
-                                <div>
-                                  <label className="flex items-center">
-                                    <input
-                                      type="radio"
-                                      name="flightClass"
-                                      value="Economy"
-                                      checked={flightClass === "Economy"}
-                                      onChange={() => setFlightClass("Economy")}
-                                      className="mr-2"
-                                    />
-                                    Economy
-                                  </label>
-                                  <label className="flex items-center">
-                                    <input
-                                      type="radio"
-                                      name="flightClass"
-                                      value="Business"
-                                      checked={flightClass === "Business"}
-                                      onChange={() =>
-                                        setFlightClass("Business")
-                                      }
-                                      className="mr-2"
-                                    />
-                                    Business
-                                  </label>
-                                </div>
-                                <div>
-                                  <label className="flex items-center">
-                                    <input
-                                      type="radio"
-                                      name="flightClass"
-                                      value="First"
-                                      checked={flightClass === "First"}
-                                      onChange={() => setFlightClass("First")}
-                                      className="mr-2"
-                                    />
-                                    First
-                                  </label>
-                                  <label className="flex items-center">
-                                    <input
-                                      type="radio"
-                                      name="flightClass"
-                                      value="Premium Economy"
-                                      checked={
-                                        flightClass === "Premium Economy"
-                                      }
-                                      onChange={() =>
-                                        setFlightClass("Premium Economy")
-                                      }
-                                      className="mr-2"
-                                    />
-                                    Premium
-                                  </label>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Done Button */}
-                            <button
-                              className="w-full bg-[var(--primary-btn)] text-white font-semibold py-2 rounded"
-                              onClick={() => setTravelerInputShow(false)}
-                            >
-                              Done
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {wayTabs !== "multicity" ? (
-                    <div>
-                      <Link href="/flight-result">
-                        <button className="bg-[var(--primary-btn)] h-[79px] w-[79px] rounded-xl">
-                          <Image
-                            src={search}
-                            alt="Search"
-                            className="mx-auto w-[50px] p-3"
-                          />
-                        </button>
-                      </Link>
-                    </div>
-                  ) : (
-                    ""
-                  )}
-                </div>
-                {wayTabs == "multicity" && (
-                  <div>
-                    {cities?.map((city) => (
-                      <div
-                        className="mt-5 flex items-center justify-evenly gap-5 flex-wrap"
-                        key={city.id}
-                      >
-                        <div className="border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px] w-[234px] h-[79px]">
-                          <label className="w-full cursor-pointer">
-                            <div className="block">
-                              <span className="text-[var(--gray)] text-[10px] font-semibold block ">
-                                FROM
-                              </span>
-                              <span className="text-[12px] font-semibold">
-                                Select a city
-                              </span>
-                            </div>
-                            <Select
-                              className="cursor-pointer"
-                              closeMenuOnSelect={true}
-                              components={{
-                                ...animatedComponents,
-                              }}
-                              // value={flyFromPlaceholder}
-
-                              placeholder={"Click to choose an airport"}
-                              onChange={(e) => {
-                                setFlyFrom(e.value);
-                                setFlyFromPlaceholder({
-                                  label: e.label,
-                                  value: e.value,
-                                });
-                              }}
-                              options={options}
-                              styles={customStyles}
-                            />
-                          </label>
-                        </div>
-                        <div className="border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px] w-[234px] h-[79px]">
-                          <label className="w-full cursor-pointer">
-                            <div className="block">
-                              <span className="text-[var(--gray)] text-[10px] font-semibold block ">
-                                To
-                              </span>
-                              <span className="text-[12px] font-semibold">
-                                Select a city
-                              </span>
-                            </div>
-                            <Select
-                              className="cursor-pointer"
-                              closeMenuOnSelect={true}
-                              components={{
-                                ...animatedComponents,
-                              }}
-                              placeholder={"Click to choose an airport"}
-                              // value={flyToPlaceholder}
-                              onChange={(e) => {
-                                setFlyTo(e.value);
-                                setFlyToPlaceholder({
-                                  label: e.label,
-                                  value: e.value,
-                                });
-                              }}
-                              options={options}
-                              styles={customStyles}
-                            />
-                          </label>
-                        </div>
-                        <div
-                          className={`border-2 border-[#BEA8A8] pt-2 ps-5 rounded-[13px] w-[234px]  h-[79px] flex `}
-                        >
-                          <label className="w-full cursor-pointer ">
-                            <div className="block">
-                              <span className="text-[var(--gray)] text-[9px] font-semibold block ">
-                                Journey Date
-                              </span>
-                              <span className="text-[12px]">
-                                {/* {flyFromPlaceholder.value} */}
-                                Saturday
-                              </span>
-                            </div>
-
-                            {/* Conditionally render the DayPicker */}
-                            <DatePicker
-                              minDate={new Date()}
-                              selected={departureDate}
-                              className="custom-datepicker-input"
-                              calendarClassName="custom-datepicker-calendar"
-                              onChange={(date) => setDepartureDate(date)}
-                            />
-                          </label>
-                        </div>
-                        <div class="flex items-center border border-gray-300 rounded-[13px] w-[234px]  h-[79px] overflow-hidden ">
-                          <button
-                            class="px-4 py-2 text-gray-600 text-[12px] w-[70%]"
-                            onClick={handleAddCity}
-                            disabled={cities.length > 2}
-                          >
-                            Add Another City
-                          </button>
-                          <button
-                            class="border-l border-gray-300 p-2 flex items-center justify-center text-gray-400 hover:text-gray-600  w-[25%]  h-full "
-                            onClick={handleDeleteCity}
-                          >
-                            <span className="bg-gray-200 rounded-full w-8 h-8 flex justify-center items-center">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="h-6 w-6 text-white font-bold"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-end mt-5">
-                      <Link href={"/flight-result"}>
-                        <button
-                          className="bg-[var(--primary-btn)] h-[54px] w-[173px] rounded-md flex items-center justify-center"
-                          onClick={() => <Link href={"flight-result"}></Link>}
-                        >
-                          <Image
-                            src={search}
-                            alt=""
-                            className=" w-[50px] p-3"
-                          />
-                          <span className="text-[20px] text-white underline font-bold py-1">
-                            Search
-                          </span>
-                        </button>
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* Traveler & Class */}
+          <div className="flex flex-col items-start">
+            <label className="text-gray-600 mb-2">Traveler, Class</label>
+            <div className="flex items-center gap-4">
+              <select
+                value={passengerType}
+                onChange={(e) => setPassengerType(e.target.value)}
+                className="border p-3 h-20 rounded-lg"
+              >
+                <option value="ADT">Adult (ADT)</option>
+                <option value="CHD">Child (CHD)</option>
+                <option value="INF">Infant (INF)</option>
+              </select>
+              <input
+                type="number"
+                min="1"
+                value={passengerQuantity}
+                onChange={(e) => setPassengerQuantity(e.target.value)}
+                className="border p-3 h-20 px-5 rounded-lg w-20"
+              />
             </div>
           </div>
         </div>
-        <RequestNow />
+
+        {/* Search Button */}
+        <button
+          onClick={fetchFlightData}
+          className="mt-6 bg-purple-600 text-white px-10 py-3 rounded-lg text-lg font-semibold flex items-center gap-2"
+        >
+          <i className="fas fa-search"></i> Search Flights
+        </button>
       </div>
-    </section>
+    </div>
+  </div>
+
+  {/* Loader and Error Messages */}
+  <div>
+  {loading && (
+    <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+      <div class="loader">
+      <div class="wait"> Loading...</div>
+      <div class="iata_code departure_city">DAC</div>
+      <div class="plane">
+        <img src="https://zupimages.net/up/19/34/4820.gif" class="plane-img"/>
+      </div>
+      <div class="earth-wrapper">
+        <div class="earth"></div>
+      </div>  
+      <div class="iata_code arrival_city">JFK</div>
+    </div>
+    </div>
+  )}
+  {error && <p className="text-red-500">{error}</p>}
+</div>
+
+</section>
+
+
+      {/* Display Flight Results */}
+      <section className=" bg-slate-200 w-full">
+        <div className="flex justify-center w-full">
+          <div className="grid grid-cols-1 mt-[80px] gap-6">
+            {flights.map((flight, index) => {
+              const segment = flight?.segments?.[0];
+              const fare = flight?.fares;
+              console.log(flights)
+              if (!segment || !fare) return null;
+
+              const imgUrl = segment?.OperatingCarrierCode
+                ? `https://premium255.web-hosting.com:2083/cpsess8408782632/viewer/home%2farcnknob%2fassets%2fairlines/${segment.OperatingCarrierCode}.png`
+                : '/images/default-airline-logo.png'; // Fallback image
+
+              return (
+                <div key={index} className="space-y-8">
+  <div className="max-w-[1000px] bg-white relative rounded-2xl shadow-md">
+    {/* Best Deal Badge */}
+    <div className="absolute left-[-12px] top-3 bg-[url('/images/badge.png')] bg-no-repeat bg-contain w-28 h-10 flex items-center justify-center">
+      <span className="text-white text-xs text-center pb-2 font-semibold">Best Deal</span>
+    </div>
+
+    {/* Flight Details */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 md:h-[160px]">
+      {/* Airline Logo and Name */}
+      <div className="flex items-center gap-4">
+        <Image src={biman} alt="airline logo" className="w-14 h-auto" />
+        <span className="text-sm font-medium">{segment?.operating_airline || 'Unknown Airline'}</span>
+      </div>
+
+      {/* Flight Information */}
+      <div className="flex flex-col justify-between">
+        <div className="flex justify-between items-center">
+          <span>{segment?.DepartureDateTime ? new Date(segment.DepartureDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}</span>
+          <span>{segment?.ArrivalDateTime ? new Date(segment.ArrivalDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}</span>
+        </div>
+
+        <div className="flex items-center justify-center flex-col space-y-2">
+          <span className="text-sm">{segment?.stops === 0 ? 'Non-stop' : `${segment.stops} Stops`}</span>
+          <Image src={arrowRight} alt="Flight Path Arrow" />
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span>{segment?.DepartureAirportLocationCode || 'N/A'}</span>
+          <span>{segment?.ArrivalAirportLocationCode || 'N/A'}</span>
+        </div>
+      </div>
+
+      {/* Fare Information */}
+      <div className="flex flex-col justify-between items-end">
+        <div className="text-right space-y-2">
+          {fare.BaseFare && <p className="text-sm text-gray-500 line-through">${fare.BaseFare}</p>}
+          <p className="text-yellow-600 text-2xl font-bold">${fare.TotalFare || 'N/A'}</p>
+        </div>
+
+        <button className="bg-purple-600 text-white py-2 px-6 rounded-lg flex items-center justify-center space-x-2">
+          <span>Select</span>
+          <Image src={right} alt="Right Arrow" />
+        </button>
+      </div>
+    </div>
+
+    {/* Expandable Details Section */}
+    <div className="border-t pt-4 pb-4 flex justify-between items-start text-sm">
+      {/* Flight Details */}
+      <div className=' pl-5'>
+        <button className="text-blue-600" onClick={() => toggleDetails(index)}>
+          Flight Details {openDetailsIndex === index ? '▲' : '▼'}
+        </button>
+        {openDetailsIndex === index && (
+          <div className="mt-2 border p-4 rounded-lg bg-gray-50 space-y-2">
+            <p><strong>Flight Number:</strong> {segment?.OperatingFlightNumber || 'N/A'}</p>
+            <p><strong>Cabin Class:</strong> {segment?.CabinClassCode || 'N/A'}</p>
+            <p><strong>Baggage Info:</strong> {segment?.CheckinBaggage?.[0]?.Value || 'N/A'} Checked, {segment?.CabinBaggage?.[0]?.Value || 'N/A'} Carry-on</p>
+            <p><strong>Equipment:</strong> {segment?.Equipment || 'N/A'}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Refund Information */}
+      <div className=' pr-5'>
+        <button className="text-blue-600" onClick={() => toggleRefundable(index)}>
+          Partially Refundable {openRefundableIndex === index ? '▲' : '▼'}
+        </button>
+        {openRefundableIndex === index && (
+          <div className="mt-2 border p-4 rounded-lg bg-gray-50 space-y-2">
+            <p><strong>Refund Allowed:</strong> {flight.penaltiesData?.RefundAllowed ? 'Yes' : 'No'}</p>
+            <p><strong>Refund Penalty:</strong> {flight.penaltiesData?.RefundPenaltyAmount || 'N/A'} {flight.penaltiesData?.Currency || 'N/A'}</p>
+            <p><strong>Change Allowed:</strong> {flight.penaltiesData?.ChangeAllowed ? 'Yes' : 'No'}</p>
+            <p><strong>Change Penalty:</strong> {flight.penaltiesData?.ChangePenaltyAmount || 'N/A'} {flight.penaltiesData?.Currency || 'N/A'}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
+              );
+            })}
+          </div>
+        </div>
+      </section>
+      
+    </div>
   );
 };
 
